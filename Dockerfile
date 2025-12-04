@@ -55,6 +55,9 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Manually copy mime from builder node_modules to ensure it exists
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/mime ./node_modules/mime
+
 USER nextjs
 
 EXPOSE 3000

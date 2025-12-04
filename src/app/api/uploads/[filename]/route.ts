@@ -5,9 +5,9 @@ import mime from "mime";
 
 export async function GET(
     request: Request,
-    { params }: { params: { filename: string } }
+    { params }: { params: Promise<{ filename: string }> }
 ) {
-    const filename = params.filename;
+    const { filename } = await params;
     const filePath = path.join(process.cwd(), "public/uploads", filename);
 
     console.log(`[Image Serve] Request for: ${filename}`);
