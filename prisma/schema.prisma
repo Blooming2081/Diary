@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  name        String?
+  gridColumns       Int      @default(3)
+  viewMode          String   @default("brief") // "title", "content", "brief"
+  searchGridColumns Int      @default(3)
+  searchViewMode    String   @default("brief") // "title", "content", "brief"
+  diaries           Diary[]
+  moods       Mood[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Mood {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  diaries   DiaryMood[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Diary {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  weather   String
+  date      DateTime
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  moods     DiaryMood[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DiaryMood {
+  diaryId   String
+  moodId    String
+  diary     Diary    @relation(fields: [diaryId], references: [id], onDelete: Cascade)
+  mood      Mood     @relation(fields: [moodId], references: [id], onDelete: Cascade)
+
+  @@id([diaryId, moodId])
+}

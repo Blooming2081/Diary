@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  app:
+    container_name: diary-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/diary
+      NEXTAUTH_SECRET: supersecret
+      NEXTAUTH_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    volumes:
+      - ./public/uploads:/app/public/uploads
+
+  db:
+    image: postgres:15-alpine
+    container_name: diary-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: diary
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
