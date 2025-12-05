@@ -10,12 +10,14 @@ services:
       DATABASE_URL: postgresql://user:password@db:5432/diary
       NEXTAUTH_SECRET: supersecret
       NEXTAUTH_URL: http://localhost:3000
+      ENCRYPTION_SECRET: super-secure-encryption-secret-key-change-me
     ports:
       - "3000:3000"
     depends_on:
       - db
     volumes:
       - ./public/uploads:/app/public/uploads
+    command: sh -c "prisma db push --skip-generate && node server.js"
 
   db:
     image: postgres:15-alpine

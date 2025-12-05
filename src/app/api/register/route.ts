@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { generateUserKey, encryptKey } from "@/lib/crypto";
 
 const registerSchema = z.object({
     email: z.string().email(),
@@ -27,11 +28,16 @@ export async function POST(req: Request) {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Generate and encrypt user security key
+        const rawKey = generateUserKey();
+        const encryptedKey = encryptKey(rawKey);
+
         const user = await prisma.user.create({
             data: {
                 email,
                 password: hashedPassword,
                 name,
+                encryptionKey: encryptedKey,
             },
         });
 

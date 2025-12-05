@@ -77,28 +77,41 @@ export default function DiaryPage() {
     return (
         <div className="max-w-3xl mx-auto space-y-8">
             <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={() => router.back()}>
+                <Button
+                    variant="secondary"
+                    onClick={() => router.back()}
+                    className="hover:bg-gray-200 transition-transform hover:scale-105 shadow-md"
+                >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     뒤로 가기
                 </Button>
                 <div className="flex gap-2">
                     <Link href={`/diary/${id}/edit`}>
-                        <Button variant="outline" size="sm">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="hover:bg-gray-200 transition-transform hover:scale-105 shadow-md"
+                        >
                             <Pencil className="mr-2 h-4 w-4" />
                             수정
                         </Button>
                     </Link>
-                    <Button variant="destructive" size="sm" onClick={handleDelete}>
+                    <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDelete}
+                        className="transition-transform hover:scale-105 shadow-md hover:bg-red-700"
+                    >
                         <Trash2 className="mr-2 h-4 w-4" />
                         삭제
                     </Button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border p-8 space-y-6">
+            <div className="bg-white rounded-xl shadow-md p-8 space-y-6">
                 <div className="flex justify-between items-start border-b pb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    <div className="flex-1 min-w-0 pr-4">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2 break-words">
                             {diary.title}
                         </h1>
                         <p className="text-gray-500">

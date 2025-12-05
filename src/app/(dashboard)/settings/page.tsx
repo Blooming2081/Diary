@@ -211,6 +211,41 @@ export default function SettingsPage() {
         }
     };
 
+    const [showKey, setShowKey] = useState(false);
+    const [newKey, setNewKey] = useState("");
+
+    const onUpdateKey = async (keyToUpdate: string, action: string) => {
+        if (!keyToUpdate) return;
+        // Confirmation is handled by caller or here if needed. 
+        // For 'Recover', we might want a confirmation too.
+        if (action === "복구") {
+            if (!confirm("보안 키를 복구하시겠습니까? \n\n이 키로 암호화되었던 과거의 사진들이 다시 보이게 됩니다.")) return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await fetch("/api/user/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ encryptionKey: keyToUpdate }),
+            });
+
+            if (res.ok) {
+                await update({ encryptionKey: keyToUpdate });
+                setNewKey("");
+                alert(`보안 키가 ${action}되었습니다.`);
+                router.refresh();
+            } else {
+                alert("키 업데이트 실패");
+            }
+        } catch (error) {
+            console.error("Failed to update key", error);
+            alert("오류가 발생했습니다.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-10">
             <div>
@@ -220,7 +255,7 @@ export default function SettingsPage() {
 
             <div className="grid gap-8">
                 {/* Mood Settings */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                <div className="bg-white p-6 rounded-xl shadow-md">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                         <Plus className="h-5 w-5" /> 기분 관리
                     </h2>
@@ -236,8 +271,9 @@ export default function SettingsPage() {
                         </div>
                         <Button
                             type="submit"
+                            variant="secondary"
                             disabled={loading}
-                            className="transition-transform hover:scale-105"
+                            className="transition-transform hover:scale-105 shadow-md hover:bg-gray-200"
                         >
                             추가
                         </Button>
@@ -261,8 +297,86 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
+                <div className="bg-white p-6 rounded-xl shadow-md">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-indigo-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                        보안 키 관리
+                    </h2>
+                    <div className="space-y-4">
+                        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 text-sm text-yellow-800">
+                            <p className="font-bold mb-1">⚠️ 매우 중요합니다!</p>
+                            <p>이 키는 사진을 암호화/복호화하는 데 사용됩니다. <strong>이 키를 잃어버리면 사진을 영구적으로 복구할 수 없습니다.</strong> 안전한 곳에 보관하세요.</p>
+                            <p className="mt-2">앱을 재설치하거나 DB를 복구한 경우, <strong>기존 키를 아래 '복구' 란에 입력하여 사진을 복구</strong>할 수 있습니다.</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                현재 보안 키
+                            </label>
+                            <div className="flex gap-2">
+                                <div className="flex-1 bg-gray-100 p-3 rounded-lg font-mono text-sm break-all">
+                                    {showKey ? (
+                                        (session?.user as any)?.encryptionKey || "키 없음"
+                                    ) : (
+                                        "••••••••••••••••••••••••••••••••"
+                                    )}
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => setShowKey(!showKey)}
+                                    className="hover:bg-gray-200 transition-transform hover:scale-105 shadow-md"
+                                >
+                                    {showKey ? "숨기기" : "보기"}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        if (confirm("보안 키를 새로 발급하시겠습니까? \n\n주의: 키가 변경되면 기존에 암호화된 사진들은 더 이상 볼 수 없게 됩니다. (기존 키를 백업해두지 않았다면 영구적으로 손실됩니다.)")) {
+                                            const array = new Uint8Array(32);
+                                            window.crypto.getRandomValues(array);
+                                            const generatedKey = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+                                            onUpdateKey(generatedKey, "변경");
+                                        }
+                                    }}
+                                    disabled={loading}
+                                    className="transition-transform hover:scale-105 shadow-md hover:bg-gray-200 cursor-pointer"
+                                >
+                                    변경
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="pt-4 border-t">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                보안 키 복구
+                            </label>
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="예전 보안 키 입력 (복구용)"
+                                    value={newKey}
+                                    onChange={(e) => setNewKey(e.target.value)}
+                                    className="font-mono"
+                                />
+                                <Button
+                                    onClick={() => onUpdateKey(newKey, "복구")}
+                                    disabled={loading || !newKey}
+                                    variant="secondary"
+                                    className="transition-transform hover:scale-105 shadow-md cursor-pointer hover:bg-gray-200"
+                                >
+                                    복구
+                                </Button>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                                * 기존 키를 입력하면 예전 사진들을 다시 볼 수 있습니다.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Display Settings */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                <div className="bg-white p-6 rounded-xl shadow-md">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                         <LayoutGrid className="h-5 w-5" /> 홈 화면 설정
                     </h2>
@@ -298,9 +412,9 @@ export default function SettingsPage() {
                                     <button
                                         key={mode.value}
                                         onClick={() => handleViewModeChange(mode.value)}
-                                        className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${viewMode === mode.value
-                                            ? "bg-indigo-600 text-white border-indigo-600"
-                                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                                        className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors cursor-pointer ${viewMode === mode.value
+                                            ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-indigo-200"
                                             }`}
                                     >
                                         {mode.label}
@@ -312,7 +426,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Profile Settings */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                <div className="bg-white p-6 rounded-xl shadow-md">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                         <User className="h-5 w-5" /> 프로필 설정
                     </h2>
@@ -346,7 +460,8 @@ export default function SettingsPage() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="transition-transform hover:scale-105"
+                            variant="secondary"
+                            className="transition-transform hover:scale-105 shadow-md hover:bg-gray-200"
                         >
                             프로필 업데이트
                         </Button>
@@ -354,7 +469,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Delete Account */}
-                <div className="bg-red-50 p-6 rounded-xl border border-red-100">
+                <div className="bg-red-50 p-6 rounded-xl border border-red-100 shadow-md">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-red-700">
                         <Trash2 className="h-5 w-5" /> 회원 탈퇴
                     </h2>
@@ -362,10 +477,10 @@ export default function SettingsPage() {
                         탈퇴 시 작성한 일기와 모든 정보가 영구적으로 삭제되며 복구할 수 없습니다.
                     </p>
                     <Button
-                        variant="destructive"
+                        variant="outline"
                         onClick={onDeleteAccount}
                         disabled={loading}
-                        className="transition-transform hover:scale-105"
+                        className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-700 transition-transform hover:scale-105 shadow-md"
                     >
                         회원 탈퇴
                     </Button>

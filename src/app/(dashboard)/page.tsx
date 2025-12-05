@@ -49,14 +49,14 @@ export default function DashboardPage() {
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between">
-                <div>
+                <div className="cursor-default">
                     <h1 className="text-3xl font-bold text-gray-900">
                         안녕하세요, {session?.user?.name}님!
                     </h1>
                     <p className="text-gray-500 mt-2">오늘의 이야기를 기록해보세요.</p>
                 </div>
                 <Link href="/write">
-                    <Button className="rounded-full">
+                    <Button variant="secondary" className="rounded-xl transition-transform hover:scale-105 shadow-md hover:bg-gray-200">
                         <Plus className="mr-2 h-4 w-4" />
                         일기 쓰기
                     </Button>
@@ -87,11 +87,11 @@ export default function DashboardPage() {
                         <Link
                             key={diary.id}
                             href={`/diary/${diary.id}`}
-                            className="group block rounded-xl border bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-indigo-200"
+                            className="group block rounded-xl bg-white p-6 shadow-md transition-all hover:shadow-lg"
                         >
                             <div className="flex items-start justify-between mb-4">
-                                <div>
-                                    <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                                <div className="flex-1 min-w-0 pr-4">
+                                    <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-1 break-all">
                                         {diary.title}
                                     </h3>
                                     <p className="text-sm text-gray-500 mt-1">
@@ -100,7 +100,7 @@ export default function DashboardPage() {
                                         })}
                                     </p>
                                 </div>
-                                <WeatherIcon className={cn("h-5 w-5", weatherColor)} />
+                                <WeatherIcon className={cn("h-5 w-5 flex-shrink-0", weatherColor)} />
                             </div>
 
                             {viewMode !== "title" && (
@@ -140,7 +140,7 @@ export default function DashboardPage() {
                 <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed">
                     <p className="text-gray-500 mb-4">아직 작성된 일기가 없습니다.</p>
                     <Link href="/write">
-                        <Button variant="outline">첫 일기 작성하기</Button>
+                        <Button variant="secondary" className="transition-transform hover:scale-105 shadow-md hover:bg-gray-200">첫 일기 작성하기</Button>
                     </Link>
                 </div>
             )}

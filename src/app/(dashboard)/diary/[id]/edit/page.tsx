@@ -227,12 +227,13 @@ export default function EditDiaryPage() {
                 <div className="flex justify-end gap-4">
                     <Button
                         type="button"
-                        variant="outline"
+                        variant="secondary"
                         onClick={() => router.back()}
+                        className="hover:bg-gray-200 transition-transform hover:scale-105 shadow-md"
                     >
                         취소
                     </Button>
-                    <Button type="submit" disabled={saving}>
+                    <Button type="submit" disabled={saving} variant="secondary" className="transition-transform hover:scale-105 shadow-md hover:bg-gray-200">
                         {saving ? "저장 중..." : "수정 완료"}
                     </Button>
                 </div>

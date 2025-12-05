@@ -13,6 +13,7 @@ model User {
   email       String   @unique
   password    String
   name        String?
+  encryptionKey String?  // Encrypted user security key
   gridColumns       Int      @default(3)
   viewMode          String   @default("brief") // "title", "content", "brief"
   searchGridColumns Int      @default(3)

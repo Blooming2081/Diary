@@ -65,8 +65,8 @@ export default function DashboardLayout({
                         </div>
                     </div>
                     <Button
-                        variant="outline"
-                        className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700"
+                        variant="secondary"
+                        className="w-full justify-start transition-transform hover:scale-105 shadow-md hover:bg-gray-200"
                         onClick={() => signOut()}
                     >
                         <LogOut className="mr-3 h-4 w-4" />

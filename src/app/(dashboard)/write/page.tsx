@@ -230,12 +230,18 @@ export default function WritePage() {
                 <div className="flex justify-end gap-4">
                     <Button
                         type="button"
-                        variant="outline"
+                        variant="secondary"
                         onClick={handleBack}
+                        className="hover:bg-gray-200 transition-transform hover:scale-105 shadow-md"
                     >
                         취소
                     </Button>
-                    <Button type="submit" disabled={loading}>
+                    <Button
+                        type="submit"
+                        variant="secondary"
+                        disabled={loading}
+                        className="transition-transform hover:scale-105 shadow-md hover:bg-gray-200"
+                    >
                         {loading ? "저장 중..." : "저장하기"}
                     </Button>
                 </div>

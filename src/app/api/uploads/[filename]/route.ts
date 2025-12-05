@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import mime from "mime";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { decryptImage } from "@/lib/crypto";
 
 export async function GET(
     request: Request,
@@ -19,15 +22,30 @@ export async function GET(
     }
 
     try {
-        const fileBuffer = fs.readFileSync(filePath);
+        const fileBuffer = fs.readFileSync(filePath) as unknown as Buffer;
         const mimeType = mime.getType(filePath) || "application/octet-stream";
+
+        let finalBuffer = fileBuffer;
+
+        // Attempt decryption if user is logged in and has a key
+        const session = await getServerSession(authOptions);
+        if (session?.user?.encryptionKey) {
+            try {
+                finalBuffer = decryptImage(fileBuffer, session.user.encryptionKey);
+                console.log(`[Image Serve] Decrypted image for user: ${session.user.email}`);
+            } catch (error) {
+                // If decryption fails, it might be an old unencrypted image or wrong key.
+                // We'll try to serve it as is, but log the error.
+                console.warn(`[Image Serve] Decryption failed (serving raw):`, error);
+            }
+        }
 
         console.log(`[Image Serve] Serving with mime: ${mimeType}`);
 
-        return new NextResponse(fileBuffer, {
+        return new NextResponse(finalBuffer as any, {
             headers: {
                 "Content-Type": mimeType,
-                "Cache-Control": "public, max-age=31536000, immutable",
+                "Cache-Control": "private, no-cache, no-store, must-revalidate",
             },
         });
     } catch (error) {

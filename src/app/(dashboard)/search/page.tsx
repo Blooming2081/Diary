@@ -127,7 +127,7 @@ function SearchContent() {
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="transition-transform hover:scale-105"
+                        className="transition-transform hover:scale-105 shadow-md"
                     >
                         검색
                     </Button>
