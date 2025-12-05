@@ -7,6 +7,8 @@ import { Home, PenTool, Search, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
+import Logo from "@/components/ui/logo";
+
 const navigation = [
     { name: "홈", href: "/", icon: Home },
     { name: "검색", href: "/search", icon: Search },
@@ -25,8 +27,8 @@ export default function DashboardLayout({
         <div className="flex h-screen overflow-hidden bg-gray-50">
             {/* Sidebar */}
             <div className="hidden w-64 flex-col bg-white shadow-lg md:flex h-full">
-                <div className="flex h-16 items-center justify-center border-b">
-                    <h1 className="text-xl font-bold text-indigo-600">My Diary</h1>
+                <div className="flex h-16 items-center justify-center border-b px-4">
+                    <Logo size={32} />
                 </div>
                 <div className="flex flex-1 flex-col overflow-y-auto p-4">
                     <nav className="space-y-2">

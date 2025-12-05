@@ -9,6 +9,7 @@ import { Cloud, CloudRain, CloudSnow, Sun, Search as SearchIcon, Filter } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useDebounce } from "@/hooks/use-debounce";
 
 type Diary = {
     id: string;
@@ -41,7 +42,11 @@ function SearchContent() {
     // Filter states
     const [query, setQuery] = useState(searchParams.get("q") || "");
     const [weather, setWeather] = useState(searchParams.get("weather") || "");
-    const [moodId, setMoodId] = useState(searchParams.get("moodId") || "");
+    const [moodIds, setMoodIds] = useState<string[]>(
+        searchParams.get("moodId") ? searchParams.get("moodId")!.split(",") : []
+    );
+
+    const [debouncedQuery] = useDebounce(query, 500);
 
     useEffect(() => {
         fetch("/api/moods")
@@ -49,60 +54,35 @@ function SearchContent() {
             .then((data) => setMoods(data));
     }, []);
 
-    const fetchDiaries = async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams();
-            if (query) params.append("search", query); // API expects 'search', not 'q'
-            if (weather) params.append("weather", weather);
-            if (moodId) params.append("moodId", moodId);
-
-            const res = await fetch(`/api/diaries?${params.toString()}`);
-            const data = await res.json();
-            setDiaries(data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        // Sync state with URL params on load/change
-        setQuery(searchParams.get("q") || "");
-        setWeather(searchParams.get("weather") || "");
-        setMoodId(searchParams.get("moodId") || "");
+        const fetchDiaries = async () => {
+            setLoading(true);
+            const params = new URLSearchParams();
+            if (debouncedQuery) params.append("search", debouncedQuery);
+            if (weather) params.append("weather", weather);
+            if (moodIds.length > 0) params.append("moodId", moodIds.join(","));
 
-        // Fetch immediately based on URL params
-        const params = new URLSearchParams(searchParams.toString());
-        // Map 'q' to 'search' for the API call if needed, but fetchDiaries handles state
-        // Actually, let's just call fetchDiaries with current state, but state might not be updated yet.
-        // Better to parse params directly for the initial fetch.
+            try {
+                const res = await fetch(`/api/diaries?${params.toString()}`);
+                const data = await res.json();
+                setDiaries(data);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        const searchQuery = searchParams.get("q") || "";
-        const weatherQuery = searchParams.get("weather") || "";
-        const moodIdQuery = searchParams.get("moodId") || "";
-
-        const apiParams = new URLSearchParams();
-        if (searchQuery) apiParams.append("search", searchQuery);
-        if (weatherQuery) apiParams.append("weather", weatherQuery);
-        if (moodIdQuery) apiParams.append("moodId", moodIdQuery);
-
-        setLoading(true);
-        fetch(`/api/diaries?${apiParams.toString()}`)
-            .then((res) => res.json())
-            .then((data) => setDiaries(data))
-            .catch((err) => console.error(err))
-            .finally(() => setLoading(false));
-
-    }, [searchParams]);
+        fetchDiaries();
+    }, [debouncedQuery, weather, moodIds]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
+        // The search is already handled by debounce effect, but updating URL is good practice
         const params = new URLSearchParams();
         if (query) params.set("q", query);
         if (weather) params.set("weather", weather);
-        if (moodId) params.set("moodId", moodId);
+        if (moodIds.length > 0) params.set("moodId", moodIds.join(","));
         router.push(`/search?${params.toString()}`);
     };
 
@@ -113,7 +93,7 @@ function SearchContent() {
                 <p className="text-gray-500 mt-2">지난 일기를 찾아보세요.</p>
             </div>
 
-            <form onSubmit={handleSearch} className="space-y-4 bg-white p-6 rounded-xl border shadow-sm">
+            <form onSubmit={handleSearch} className="space-y-6 bg-white p-6 rounded-xl border-none shadow-sm">
                 <div className="flex gap-4">
                     <div className="relative flex-1">
                         <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -124,46 +104,81 @@ function SearchContent() {
                             className="pl-10"
                         />
                     </div>
-                    <Button
-                        type="submit"
-                        disabled={loading}
-                        className="transition-transform hover:scale-105 shadow-md"
-                    >
-                        검색
-                    </Button>
                 </div>
 
-                <div className="flex flex-wrap gap-4 items-center pt-2 border-t">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Filter className="h-4 w-4" />
-                        <span>필터:</span>
+                <div className="space-y-4">
+                    {/* Weather Toggle */}
+                    <div className="block">
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setWeather("")}
+                                className={cn(
+                                    "px-4 py-2 text-sm font-medium rounded-lg transition-all border",
+                                    !weather
+                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
+                                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                )}
+                            >
+                                전체
+                            </button>
+                            {Object.entries(weatherIcons).map(([key, { label, icon: Icon, color }]) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => setWeather(key === weather ? "" : key)}
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all border cursor-pointer",
+                                        weather === key
+                                            ? "bg-white text-indigo-600 border-indigo-600 shadow-md transform scale-105"
+                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                    )}
+                                >
+                                    <Icon className={cn("w-4 h-4", weather === key ? color : "text-gray-400")} />
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
-                    <select
-                        value={weather}
-                        onChange={(e) => setWeather(e.target.value)}
-                        className="text-sm border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                        <option value="">날씨 전체</option>
-                        {Object.entries(weatherIcons).map(([key, { label }]) => (
-                            <option key={key} value={key}>
-                                {label}
-                            </option>
-                        ))}
-                    </select>
-
-                    <select
-                        value={moodId}
-                        onChange={(e) => setMoodId(e.target.value)}
-                        className="text-sm border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                        <option value="">기분 전체</option>
-                        {moods.map((mood) => (
-                            <option key={mood.id} value={mood.id}>
-                                {mood.name}
-                            </option>
-                        ))}
-                    </select>
+                    {/* Mood Multi-select Tags (Box Style) */}
+                    <div className="block">
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setMoodIds([])}
+                                className={cn(
+                                    "px-4 py-2 text-sm font-medium rounded-lg transition-all border cursor-pointer",
+                                    moodIds.length === 0
+                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
+                                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                )}
+                            >
+                                전체
+                            </button>
+                            {moods.map((mood) => (
+                                <button
+                                    key={mood.id}
+                                    type="button"
+                                    onClick={() => {
+                                        setMoodIds((prev) =>
+                                            prev.includes(mood.id)
+                                                ? prev.filter((id) => id !== mood.id)
+                                                : [...prev, mood.id]
+                                        );
+                                    }}
+                                    className={cn(
+                                        "px-4 py-2 text-sm font-medium rounded-lg transition-all border cursor-pointer",
+                                        moodIds.includes(mood.id)
+                                            ? "bg-white text-indigo-600 border-indigo-600 shadow-md transform scale-105"
+                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                    )}
+                                >
+                                    {mood.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </form>
 
@@ -171,7 +186,7 @@ function SearchContent() {
                 <div className="text-center py-20">로딩 중...</div>
             ) : (
                 <div className="grid gap-4">
-                    {diaries.map((diary) => {
+                    {diaries.length > 0 ? diaries.map((diary) => {
                         const WeatherIcon =
                             weatherIcons[diary.weather as keyof typeof weatherIcons]?.icon || Sun;
                         const weatherColor =
@@ -182,11 +197,11 @@ function SearchContent() {
                             <Link
                                 key={diary.id}
                                 href={`/diary/${diary.id}`}
-                                className="group block rounded-xl border bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-indigo-200 hover:scale-[1.01]"
+                                className="group block rounded-xl bg-white p-6 shadow-sm transition-all hover:shadow-lg hover:-translate-y-1"
                             >
                                 <div className="flex items-start justify-between">
                                     <div>
-                                        <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors">
+                                        <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors break-all line-clamp-2">
                                             {diary.title}
                                         </h3>
                                         <p className="text-sm text-gray-500 mt-1">
@@ -198,7 +213,7 @@ function SearchContent() {
                                             {diary.moods.map(({ mood }, idx) => (
                                                 <span
                                                     key={idx}
-                                                    className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800"
+                                                    className="inline-flex items-center rounded-md bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-100"
                                                 >
                                                     {mood.name}
                                                 </span>
@@ -209,13 +224,11 @@ function SearchContent() {
                                 </div>
                             </Link>
                         );
-                    })}
-                </div>
-            )}
-
-            {!loading && diaries.length === 0 && (
-                <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed">
-                    <p className="text-gray-500">검색 결과가 없습니다.</p>
+                    }) : (
+                        <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed">
+                            <p className="text-gray-500">검색 결과가 없습니다.</p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -37,6 +38,8 @@ export default function WritePage() {
     const router = useRouter();
     const [moods, setMoods] = useState<Mood[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isAddingMood, setIsAddingMood] = useState(false);
+    const [newMoodName, setNewMoodName] = useState("");
 
     const {
         register,
@@ -120,6 +123,32 @@ export default function WritePage() {
         }
     };
 
+    const handleAddMood = async () => {
+        if (!newMoodName.trim()) return;
+
+        try {
+            const res = await fetch("/api/moods", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: newMoodName }),
+            });
+
+            if (res.ok) {
+                const newMood = await res.json();
+                setMoods((prev) => [newMood, ...prev]);
+                // Automatically select the new mood
+                toggleMood(newMood.id);
+                setNewMoodName("");
+                setIsAddingMood(false);
+            } else {
+                alert("기분 추가에 실패했습니다.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("오류가 발생했습니다.");
+        }
+    };
+
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <div>
@@ -133,7 +162,22 @@ export default function WritePage() {
                         <label className="block text-sm font-medium text-gray-700">
                             날짜
                         </label>
-                        <Input type="date" {...register("date")} />
+                        <Input
+                            type="date"
+                            max={new Date().toISOString().split("T")[0]}
+                            {...register("date", {
+                                onChange: (e) => {
+                                    const selected = new Date(e.target.value);
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+                                    if (selected > today) {
+                                        alert("미래의 날짜는 선택할 수 없습니다.");
+                                        setValue("date", today.toISOString().split("T")[0]);
+                                    }
+                                }
+                            })}
+                            className="cursor-pointer"
+                        />
                     </div>
                     <div className="space-y-4">
                         <label className="block text-sm font-medium text-gray-700">
@@ -160,7 +204,7 @@ export default function WritePage() {
                                     type="button"
                                     onClick={() => setValue("weather", option.value as any, { shouldDirty: true })}
                                     className={cn(
-                                        "flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all w-24 h-24",
+                                        "flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all w-24 h-24 cursor-pointer",
                                         isSelected
                                             ? "border-indigo-600 bg-indigo-50"
                                             : "border-gray-200 hover:border-gray-300 bg-white"
@@ -197,7 +241,7 @@ export default function WritePage() {
                                 type="button"
                                 onClick={() => toggleMood(mood.id)}
                                 className={cn(
-                                    "px-4 py-2 rounded-full text-sm font-medium transition-colors border",
+                                    "px-4 py-2 rounded-full text-sm font-medium transition-colors border cursor-pointer",
                                     selectedMoodIds?.includes(mood.id)
                                         ? "bg-indigo-600 text-white border-indigo-600"
                                         : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
@@ -206,14 +250,63 @@ export default function WritePage() {
                                 {mood.name}
                             </button>
                         ))}
+
+                        {/* Add Mood Button/Input */}
+                        {isAddingMood ? (
+                            <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-full border border-gray-200 pr-2">
+                                <Input
+                                    ref={(e) => {
+                                        if (e) setTimeout(() => e.focus(), 0);
+                                    }}
+                                    value={newMoodName}
+                                    onChange={(e) => setNewMoodName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            handleAddMood();
+                                        }
+                                    }}
+                                    className="h-8 w-24 text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-3"
+                                    placeholder="새 기분"
+                                />
+                                <div className="flex items-center gap-1 border-l pl-2 border-gray-300 h-5">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleAddMood}
+                                        disabled={!newMoodName.trim()}
+                                        variant="secondary"
+                                        className="h-7 px-3 text-xs rounded-full shadow-sm hover:bg-gray-200"
+                                    >
+                                        추가
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => {
+                                            setIsAddingMood(false);
+                                            setNewMoodName("");
+                                        }}
+                                        className="h-7 px-3 text-xs rounded-full shadow-sm hover:bg-gray-200 bg-white"
+                                    >
+                                        취소
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setIsAddingMood(true)}
+                                className="px-4 py-2 rounded-full text-sm font-medium transition-colors border border-dashed border-gray-300 text-gray-500 hover:border-indigo-500 hover:text-indigo-600 bg-gray-50/50 cursor-pointer"
+                            >
+                                + 추가
+                            </button>
+                        )}
+
                     </div>
                     {errors.moodIds && (
                         <p className="text-xs text-red-500">{errors.moodIds.message}</p>
-                    )}
-                    {moods.length === 0 && (
-                        <p className="text-sm text-gray-500">
-                            설정 페이지에서 기분을 추가해주세요.
-                        </p>
                     )}
                 </div>
 
