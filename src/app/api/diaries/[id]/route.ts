@@ -128,6 +128,29 @@ export async function DELETE(
             return NextResponse.json({ message: "Not found" }, { status: 404 });
         }
 
+        // Delete associated images
+        try {
+            const fs = await import("fs");
+            const path = await import("path");
+
+            const imgRegex = /<img[^>]+src=["']([^"']+)["']/g;
+            let match;
+            while ((match = imgRegex.exec(diary.content)) !== null) {
+                const src = match[1];
+                if (src && src.includes("/uploads/")) {
+                    const filename = path.basename(src);
+                    const filePath = path.join(process.cwd(), "public/uploads", filename);
+
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Failed to delete associated images:", error);
+            // Continue to delete diary entry even if image deletion fails
+        }
+
         await prisma.diary.delete({
             where: { id },
         });

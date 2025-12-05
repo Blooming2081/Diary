@@ -41,6 +41,14 @@ export async function POST(req: Request) {
             },
         });
 
+        // Create default moods
+        await prisma.mood.createMany({
+            data: [
+                { name: "행복함", userId: user.id },
+                { name: "슬픔", userId: user.id },
+            ],
+        });
+
         return NextResponse.json(
             { message: "User created successfully", user: { id: user.id, email: user.email, name: user.name } },
             { status: 201 }

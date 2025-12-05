@@ -83,11 +83,16 @@ export async function GET(req: Request) {
         }
 
         if (moodId) {
-            where.moods = {
-                some: {
-                    moodId: moodId,
+            const moodIds = moodId.split(",");
+            // AND logic: The diary must satisfy specific conditions for EACH moodId
+            // We use 'AND' operator with multiple 'some' clauses
+            where.AND = moodIds.map((id) => ({
+                moods: {
+                    some: {
+                        moodId: id,
+                    },
                 },
-            };
+            }));
         }
 
         const diaries = await prisma.diary.findMany({

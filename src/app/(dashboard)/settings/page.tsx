@@ -170,10 +170,14 @@ export default function SettingsPage() {
     const onUpdateProfile = async (data: ProfileFormValues) => {
         setLoading(true);
         try {
+            const payload: any = { name: data.name };
+            if (data.newPassword) payload.newPassword = data.newPassword;
+            if (data.currentPassword) payload.currentPassword = data.currentPassword;
+
             const res = await fetch("/api/user/profile", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
+                body: JSON.stringify(payload),
             });
 
             if (res.ok) {
@@ -304,9 +308,9 @@ export default function SettingsPage() {
                     </h2>
                     <div className="space-y-4">
                         <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 text-sm text-yellow-800">
-                            <p className="font-bold mb-1">⚠️ 매우 중요합니다!</p>
-                            <p>이 키는 사진을 암호화/복호화하는 데 사용됩니다. <strong>이 키를 잃어버리면 사진을 영구적으로 복구할 수 없습니다.</strong> 안전한 곳에 보관하세요.</p>
-                            <p className="mt-2">앱을 재설치하거나 DB를 복구한 경우, <strong>기존 키를 아래 '복구' 란에 입력하여 사진을 복구</strong>할 수 있습니다.</p>
+                            <p className="font-bold mb-1">⚠️ 중요</p>
+                            <p>이 키는 사진을 암호화하는 데 사용됩니다. <strong>이 키를 잃어버리면 사진을 영구적으로 복구할 수 없습니다.</strong> 안전한 곳에 보관하세요.</p>
+                            <p className="mt-2">보안 키를 변경하면 기존 사진들도 자동으로 재암호화됩니다.</p>
                         </div>
 
                         <div>
@@ -333,7 +337,7 @@ export default function SettingsPage() {
                                     type="button"
                                     variant="secondary"
                                     onClick={() => {
-                                        if (confirm("보안 키를 새로 발급하시겠습니까? \n\n주의: 키가 변경되면 기존에 암호화된 사진들은 더 이상 볼 수 없게 됩니다. (기존 키를 백업해두지 않았다면 영구적으로 손실됩니다.)")) {
+                                        if (confirm("보안 키를 새로 발급하시겠습니까? \n\n기존 사진들도 새로운 키로 안전하게 재암호화됩니다. (사진 양에 따라 시간이 소요될 수 있습니다.)")) {
                                             const array = new Uint8Array(32);
                                             window.crypto.getRandomValues(array);
                                             const generatedKey = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
