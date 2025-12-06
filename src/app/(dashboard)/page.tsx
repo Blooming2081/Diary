@@ -1,22 +1,13 @@
-"use client";
 
-import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Plus, Cloud, CloudRain, CloudSnow, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-type Diary = {
-    id: string;
-    title: string;
-    content: string;
-    weather: string;
-    date: string;
-    moods: { mood: { name: string } }[];
-};
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 const weatherIcons = {
     SUNNY: { icon: Sun, color: "text-orange-500" },
@@ -25,23 +16,27 @@ const weatherIcons = {
     SNOWY: { icon: CloudSnow, color: "text-sky-300" },
 };
 
-export default function DashboardPage() {
-    const { data: session } = useSession();
-    const [diaries, setDiaries] = useState<Diary[]>([]);
-    const [loading, setLoading] = useState(true);
+export default async function DashboardPage() {
+    const session = await getServerSession(authOptions);
 
-    useEffect(() => {
-        fetch("/api/diaries")
-            .then((res) => res.json())
-            .then((data) => {
-                setDiaries(data);
-                setLoading(false);
-            });
-    }, []);
-
-    if (loading) {
-        return <div className="p-8 text-center">로딩 중...</div>;
+    // If no session, the layout/middleware should handle it, but safe to check
+    if (!session?.user?.id) {
+        return <div className="p-8 text-center">로그인이 필요합니다.</div>;
     }
+
+    const diaries = await prisma.diary.findMany({
+        where: {
+            userId: session.user.id,
+        },
+        orderBy: { date: "desc" },
+        include: {
+            moods: {
+                include: {
+                    mood: true,
+                },
+            },
+        },
+    });
 
     const gridColumns = session?.user?.gridColumns || 3;
     const viewMode = session?.user?.viewMode || "brief";

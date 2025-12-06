@@ -1,22 +1,14 @@
-"use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { Button } from "@/components/ui/button";
 import { Cloud, CloudRain, CloudSnow, Sun, ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-type Diary = {
-    id: string;
-    title: string;
-    content: string;
-    weather: string;
-    date: string;
-    moods: { mood: { name: string } }[];
-};
+import { prisma } from "@/lib/prisma";
+import { DiaryActions } from "@/components/diary-actions";
+import { Button } from "@/components/ui/button";
 
 const weatherOptions = [
     { value: "SUNNY", label: "맑음", icon: Sun, color: "text-orange-500" },
@@ -25,44 +17,34 @@ const weatherOptions = [
     { value: "SNOWY", label: "눈", icon: CloudSnow, color: "text-sky-300" },
 ];
 
-export default function DiaryPage() {
-    const router = useRouter();
-    const params = useParams();
-    const id = params.id as string;
+interface DiaryPageProps {
+    params: Promise<{ id: string }>;
+}
 
-    const [diary, setDiary] = useState<Diary | null>(null);
-    const [loading, setLoading] = useState(true);
+export default async function DiaryPage({ params }: DiaryPageProps) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        redirect("/login");
+    }
 
-    useEffect(() => {
-        fetch(`/api/diaries/${id}`)
-            .then((res) => {
-                if (!res.ok) throw new Error("Failed to fetch");
-                return res.json();
-            })
-            .then((data) => {
-                setDiary(data);
-                setLoading(false);
-            })
-            .catch(() => {
-                router.push("/");
-            });
-    }, [id, router]);
+    const { id } = await params;
 
-    const handleDelete = async () => {
-        if (!confirm("정말로 이 일기를 삭제하시겠습니까?")) return;
+    // Server-side data fetching
+    const diary = await prisma.diary.findUnique({
+        where: { id },
+        include: {
+            moods: {
+                include: {
+                    mood: true,
+                },
+            },
+        },
+    });
 
-        try {
-            const res = await fetch(`/api/diaries/${id}`, {
-                method: "DELETE",
-            });
-            if (res.ok) {
-                router.push("/");
-                router.refresh();
-            }
-        } catch (error) {
-            alert("삭제 실패");
-        }
-    };
+    // Security Check: Ensure the diary belongs to the current user
+    if (!diary || diary.userId !== session.user.id) {
+        notFound();
+    }
 
     const getWeatherIcon = (weather: string) => {
         const option = weatherOptions.find((o) => o.value === weather);
@@ -71,42 +53,9 @@ export default function DiaryPage() {
         return <Icon className={cn("h-6 w-6", option.color)} />;
     };
 
-    if (loading) return <div className="text-center py-12">로딩 중...</div>;
-    if (!diary) return null;
-
     return (
         <div className="max-w-3xl mx-auto space-y-8">
-            <div className="flex items-center justify-between">
-                <Button
-                    variant="secondary"
-                    onClick={() => router.back()}
-                    className="hover:bg-gray-200 transition-transform hover:scale-105 shadow-md"
-                >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    뒤로 가기
-                </Button>
-                <div className="flex gap-2">
-                    <Link href={`/diary/${id}/edit`}>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="hover:bg-gray-200 transition-transform hover:scale-105 shadow-md"
-                        >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            수정
-                        </Button>
-                    </Link>
-                    <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleDelete}
-                        className="transition-transform hover:scale-105 shadow-md hover:bg-red-700"
-                    >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        삭제
-                    </Button>
-                </div>
-            </div>
+            <DiaryActions id={diary.id} />
 
             <div className="bg-white rounded-xl shadow-md p-8 space-y-6">
                 <div className="flex justify-between items-start border-b pb-6">
