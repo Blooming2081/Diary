@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import { DiaryActions } from "@/components/diary-actions";
 import { Button } from "@/components/ui/button";
+import { decryptKey, decryptText } from "@/lib/crypto";
 
 const weatherOptions = [
     { value: "SUNNY", label: "맑음", icon: Sun, color: "text-orange-500" },
@@ -44,6 +45,24 @@ export default async function DiaryPage({ params }: DiaryPageProps) {
     // Security Check: Ensure the diary belongs to the current user
     if (!diary || diary.userId !== session.user.id) {
         notFound();
+    }
+    // Decrypt content if it's a secret diary
+    if ((diary as any).isSecret) {
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { encryptionKey: true }
+        });
+
+        if (user?.encryptionKey) {
+            try {
+                const rawKey = decryptKey(user.encryptionKey);
+                diary.content = decryptText(diary.content, rawKey);
+            } catch (e) {
+                diary.content = "<p class='text-red-500 font-bold'>[암호화 해제 실패]</p>";
+            }
+        } else {
+            diary.content = "<p class='text-gray-400 italic'>[이 일기를 보려면 보안 키가 필요합니다]</p>";
+        }
     }
 
     const getWeatherIcon = (weather: string) => {
@@ -89,7 +108,7 @@ export default async function DiaryPage({ params }: DiaryPageProps) {
                 </div>
 
                 <div
-                    className="prose prose-lg max-w-none"
+                    className="prose prose-lg max-w-none break-words"
                     dangerouslySetInnerHTML={{ __html: diary.content }}
                 />
             </div>

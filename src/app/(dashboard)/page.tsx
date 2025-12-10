@@ -16,7 +16,14 @@ const weatherIcons = {
     SNOWY: { icon: CloudSnow, color: "text-sky-300" },
 };
 
-export default async function DashboardPage() {
+
+export default async function DashboardPage({
+    searchParams,
+}: {
+    searchParams: { [key: string]: string | string[] | undefined };
+}) {
+    const { decryptText, decryptKey } = await import("@/lib/crypto");
+
     const session = await getServerSession(authOptions);
 
     // If no session, the layout/middleware should handle it, but safe to check
@@ -24,10 +31,22 @@ export default async function DashboardPage() {
         return <div className="p-8 text-center">로그인이 필요합니다.</div>;
     }
 
+    const { type: typeParam } = await searchParams;
+    const type = typeParam || "all"; // 'all', 'general', 'secret'
+
+    // Construct where clause
+    const where: any = {
+        userId: session.user.id,
+    };
+
+    if (type === "secret") {
+        where.isSecret = true;
+    } else if (type === "general") {
+        where.isSecret = false;
+    }
+
     const diaries = await prisma.diary.findMany({
-        where: {
-            userId: session.user.id,
-        },
+        where,
         orderBy: { date: "desc" },
         include: {
             moods: {
@@ -38,24 +57,82 @@ export default async function DashboardPage() {
         },
     });
 
+    // Decrypt secret diaries
+    let rawKey = "";
+    if (session.user.encryptionKey) {
+        try {
+            rawKey = decryptKey(session.user.encryptionKey);
+        } catch (e) {
+            console.error("Failed to decrypt user key");
+        }
+    }
+
+    const processedDiaries = diaries.map((diary) => {
+        if ((diary as any).isSecret) {
+            if (rawKey) {
+                try {
+                    return { ...diary, content: decryptText(diary.content, rawKey) };
+                } catch (e) {
+                    return { ...diary, content: "(암호화 해제 실패)" };
+                }
+            } else {
+                return { ...diary, content: "(보안 키 필요)" };
+            }
+        }
+        return diary;
+    });
+
     const gridColumns = session?.user?.gridColumns || 3;
     const viewMode = session?.user?.viewMode || "brief";
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="cursor-default">
                     <h1 className="text-3xl font-bold text-gray-900">
                         안녕하세요, {session?.user?.name}님!
                     </h1>
                     <p className="text-gray-500 mt-2">오늘의 이야기를 기록해보세요.</p>
                 </div>
-                <Link href="/write">
-                    <Button variant="secondary" className="rounded-xl transition-transform hover:scale-105 shadow-md hover:bg-gray-200">
-                        <Plus className="mr-2 h-4 w-4" />
-                        일기 쓰기
-                    </Button>
-                </Link>
+
+                <div className="flex gap-3">
+                    <div className="flex p-1 bg-gray-100 rounded-xl">
+                        <Link href="/?type=all">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn("rounded-lg hover:bg-white text-gray-600", type === 'all' && "bg-white text-gray-900 shadow-sm")}
+                            >
+                                전체
+                            </Button>
+                        </Link>
+                        <Link href="/?type=general">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn("rounded-lg hover:bg-white text-gray-600", type === 'general' && "bg-white text-gray-900 shadow-sm")}
+                            >
+                                일반
+                            </Button>
+                        </Link>
+                        <Link href="/?type=secret">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn("rounded-lg hover:bg-white text-gray-600", type === 'secret' && "bg-white text-gray-900 shadow-sm")}
+                            >
+                                비밀
+                            </Button>
+                        </Link>
+                    </div>
+
+                    <Link href="/write">
+                        <Button variant="secondary" className="rounded-xl transition-transform hover:scale-105 shadow-md hover:bg-gray-200">
+                            <Plus className="mr-2 h-4 w-4" />
+                            일기 쓰기
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             <div
@@ -64,14 +141,17 @@ export default async function DashboardPage() {
                     gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
                 }}
             >
-                {diaries.map((diary) => {
+                {processedDiaries.map((diary) => {
                     const WeatherIcon =
                         weatherIcons[diary.weather as keyof typeof weatherIcons]?.icon || Sun;
                     const weatherColor =
                         weatherIcons[diary.weather as keyof typeof weatherIcons]?.color ||
                         "text-gray-500";
 
-                    // Extract first image from content if exists
+                    // Extract first image from content if exists (but NO images for secret diaries in preview for security/complexity)
+                    // Or we could try to show them if we decrypted the content HTML. 
+                    // Since specific request was about text encryption, let's keep it simple.
+                    // If decrypted, the HTML tags are back, so regex works.
                     const imgMatch = diary.content.match(/<img[^>]+src="([^">]+)"/);
                     const firstImage = imgMatch ? imgMatch[1] : null;
 
@@ -82,8 +162,13 @@ export default async function DashboardPage() {
                         <Link
                             key={diary.id}
                             href={`/diary/${diary.id}`}
-                            className="group block rounded-xl bg-white p-6 shadow-md transition-all hover:shadow-lg"
+                            className="group block rounded-xl bg-white p-6 shadow-md transition-all hover:shadow-lg relative overflow-hidden"
                         >
+                            {(diary as any).isSecret && (
+                                <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded-bl-lg z-10 font-bold">
+                                    SECRET
+                                </div>
+                            )}
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex-1 min-w-0 pr-4">
                                     <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-1 break-all">
@@ -111,7 +196,7 @@ export default async function DashboardPage() {
                                         ))}
                                     </div>
 
-                                    {viewMode === "brief" && firstImage && (
+                                    {viewMode === "brief" && firstImage && !(diary as any).isSecret && ( // Hide image preview for secret diaries? Or show if decrypted? Let's show if decrypted as it is part of content.
                                         <div className="mb-4 aspect-video relative overflow-hidden rounded-lg bg-gray-100">
                                             <img
                                                 src={firstImage}
@@ -131,9 +216,11 @@ export default async function DashboardPage() {
                 })}
             </div>
 
-            {diaries.length === 0 && (
+            {processedDiaries.length === 0 && (
                 <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed">
-                    <p className="text-gray-500 mb-4">아직 작성된 일기가 없습니다.</p>
+                    <p className="text-gray-500 mb-4">
+                        {type === 'secret' ? "작성된 비밀 일기가 없습니다." : "아직 작성된 일기가 없습니다."}
+                    </p>
                     <Link href="/write">
                         <Button variant="secondary" className="transition-transform hover:scale-105 shadow-md hover:bg-gray-200">첫 일기 작성하기</Button>
                     </Link>
