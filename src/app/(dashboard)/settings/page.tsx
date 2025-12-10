@@ -228,10 +228,15 @@ export default function SettingsPage() {
 
         setLoading(true);
         try {
+            const keyMode = action === "복구" ? "recover" : "change";
+
             const res = await fetch("/api/user/settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ encryptionKey: keyToUpdate }),
+                body: JSON.stringify({
+                    encryptionKey: keyToUpdate,
+                    keyMode: keyMode
+                }),
             });
 
             if (res.ok) {

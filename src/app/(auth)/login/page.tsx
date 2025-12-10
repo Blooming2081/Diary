@@ -146,14 +146,25 @@ export default function LoginPage() {
                         </Button>
                     </form>
 
-                    <div className="text-center text-sm text-gray-500">
-                        계정이 없으신가요?{" "}
-                        <Link
-                            href="/register"
-                            className="font-semibold text-indigo-600 hover:text-indigo-500 hover:underline"
-                        >
-                            회원가입
-                        </Link>
+                    <div className="space-y-4 text-center text-sm text-gray-500">
+                        <div>
+                            계정이 없으신가요?{" "}
+                            <Link
+                                href="/register"
+                                className="font-semibold text-indigo-600 hover:text-indigo-500 hover:underline"
+                            >
+                                회원가입
+                            </Link>
+                        </div>
+                        <div>
+                            비밀번호를 잊으셨나요?{" "}
+                            <Link
+                                href="/reset-password"
+                                className="font-semibold text-indigo-600 hover:text-indigo-500 hover:underline"
+                            >
+                                비밀번호 찾기
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>

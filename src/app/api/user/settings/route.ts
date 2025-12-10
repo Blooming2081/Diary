@@ -10,6 +10,7 @@ const settingsSchema = z.object({
     searchGridColumns: z.number().min(1).max(6).optional(),
     searchViewMode: z.enum(["title", "content", "brief"]).optional(),
     encryptionKey: z.string().min(32).optional(),
+    keyMode: z.enum(["change", "recover"]).optional(), // New parameter
 });
 
 export async function PUT(req: Request) {
@@ -35,63 +36,68 @@ export async function PUT(req: Request) {
             const fs = await import("fs");
             const path = await import("path");
 
-            // 1. Get Old Key
-            const userRecord = await prisma.user.findUnique({ where: { id: session.user.id } });
+            // Only perform re-encryption if mode is NOT 'recover'
+            if (body.keyMode !== "recover") {
+                // 1. Get Old Key
+                const userRecord = await prisma.user.findUnique({ where: { id: session.user.id } });
 
-            // Only proceed with re-encryption if the user ALREADY has a key and we can decrypt it.
-            if (userRecord?.encryptionKey) {
-                try {
-                    const oldKeyRaw = decryptKey(userRecord.encryptionKey);
-                    const newKeyRaw = body.encryptionKey;
+                // Only proceed with re-encryption if the user ALREADY has a key and we can decrypt it.
+                if (userRecord?.encryptionKey) {
+                    try {
+                        const oldKeyRaw = decryptKey(userRecord.encryptionKey);
+                        const newKeyRaw = body.encryptionKey;
 
-                    // 2. Find all diaries to get image paths
-                    const diaries = await prisma.diary.findMany({
-                        where: { userId: session.user.id },
-                        select: { content: true }
-                    });
+                        // 2. Find all diaries to get image paths
+                        const diaries = await prisma.diary.findMany({
+                            where: { userId: session.user.id },
+                            select: { content: true }
+                        });
 
-                    // 3. Extract all image filenames
-                    const imageFilenames = new Set<string>();
-                    // Capture src attributes with single or double quotes
-                    const imgRegex = /<img[^>]+src=["']([^"']+)["']/g;
+                        // 3. Extract all image filenames
+                        const imageFilenames = new Set<string>();
+                        // Capture src attributes with single or double quotes
+                        const imgRegex = /<img[^>]+src=["']([^"']+)["']/g;
 
-                    for (const diary of diaries) {
-                        let match;
-                        while ((match = imgRegex.exec(diary.content)) !== null) {
-                            const src = match[1];
-                            // Only process local upload paths
-                            if (src && src.includes("/uploads/")) {
-                                const filename = path.basename(src);
-                                if (filename) imageFilenames.add(filename);
+                        for (const diary of diaries) {
+                            let match;
+                            while ((match = imgRegex.exec(diary.content)) !== null) {
+                                const src = match[1];
+                                // Only process local upload paths
+                                if (src && src.includes("/uploads/")) {
+                                    const filename = path.basename(src);
+                                    if (filename) imageFilenames.add(filename);
+                                }
                             }
                         }
-                    }
 
-                    console.log(`[KeyUpdate] Found ${imageFilenames.size} images to re-encrypt for user ${session.user.id}`);
+                        console.log(`[KeyUpdate] Found ${imageFilenames.size} images to re-encrypt for user ${session.user.id}`);
 
-                    // 4. Re-encrypt each file
-                    for (const filename of imageFilenames) {
-                        const filePath = path.join(process.cwd(), "public/uploads", filename);
-                        if (fs.existsSync(filePath)) {
-                            try {
-                                const fileBuffer = fs.readFileSync(filePath) as unknown as Buffer;
-                                // Decrypt with OLD key
-                                const decrypted = decryptImage(fileBuffer, oldKeyRaw);
-                                // Encrypt with NEW key
-                                const reEncrypted = encryptImage(decrypted, newKeyRaw);
-                                // Overwrite file
-                                fs.writeFileSync(filePath, reEncrypted);
-                                console.log(`[KeyUpdate] Successfully re-encrypted: ${filename}`);
-                            } catch (err) {
-                                console.error(`[KeyUpdate] Failed to re-encrypt ${filename}:`, err);
+                        // 4. Re-encrypt each file
+                        for (const filename of imageFilenames) {
+                            const filePath = path.join(process.cwd(), "public/uploads", filename);
+                            if (fs.existsSync(filePath)) {
+                                try {
+                                    const fileBuffer = fs.readFileSync(filePath) as unknown as Buffer;
+                                    // Decrypt with OLD key
+                                    const decrypted = decryptImage(fileBuffer, oldKeyRaw);
+                                    // Encrypt with NEW key
+                                    const reEncrypted = encryptImage(decrypted, newKeyRaw);
+                                    // Overwrite file
+                                    fs.writeFileSync(filePath, reEncrypted);
+                                    console.log(`[KeyUpdate] Successfully re-encrypted: ${filename}`);
+                                } catch (err) {
+                                    console.error(`[KeyUpdate] Failed to re-encrypt ${filename}:`, err);
+                                }
                             }
                         }
-                    }
 
-                } catch (error) {
-                    console.error("[KeyUpdate] Critical error during re-encryption process:", error);
-                    // We log but continue to update the key in DB so the user isn't stuck state.
+                    } catch (error) {
+                        console.error("[KeyUpdate] Critical error during re-encryption process:", error);
+                        // We log but continue to update the key in DB so the user isn't stuck state.
+                    }
                 }
+            } else {
+                console.log(`[KeyUpdate] Skipping re-encryption because mode is 'recover'. User: ${session.user.id}`);
             }
 
             updateData.encryptionKey = encryptKey(body.encryptionKey);
