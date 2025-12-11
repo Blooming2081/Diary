@@ -52,7 +52,7 @@ export default function WritePage() {
         watch,
         formState: { errors, isDirty },
     } = useForm<DiaryFormValues>({
-        resolver: zodResolver(diarySchema),
+        resolver: zodResolver(diarySchema) as any,
         defaultValues: {
             weather: "SUNNY",
             moodIds: [],
@@ -198,7 +198,7 @@ export default function WritePage() {
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={handleSubmit(onSubmit) as any} className="space-y-8">
                 <div className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-4">
                         <label className="block text-sm font-medium text-gray-700">
