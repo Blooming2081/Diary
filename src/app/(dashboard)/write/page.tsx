@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,8 +8,10 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Editor from "@/components/editor";
-import { Cloud, CloudRain, CloudSnow, Sun } from "lucide-react";
+import { Cloud, CloudRain, CloudSnow, Sun, Lock, Unlock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { useSession } from "next-auth/react";
 
 const diarySchema = z.object({
     title: z.string().min(1, "제목을 입력해주세요."),
@@ -18,6 +19,7 @@ const diarySchema = z.object({
     weather: z.enum(["SUNNY", "CLOUDY", "RAINY", "SNOWY"]),
     moodIds: z.array(z.string()).min(1, "최소 하나의 기분을 선택해주세요."),
     date: z.string(),
+    isSecret: z.boolean().default(false),
 });
 
 type DiaryFormValues = z.infer<typeof diarySchema>;
@@ -36,10 +38,12 @@ const weatherOptions = [
 
 export default function WritePage() {
     const router = useRouter();
+    const { data: session } = useSession();
     const [moods, setMoods] = useState<Mood[]>([]);
     const [loading, setLoading] = useState(false);
     const [isAddingMood, setIsAddingMood] = useState(false);
     const [newMoodName, setNewMoodName] = useState("");
+    const [hasKey, setHasKey] = useState(false);
 
     const {
         register,
@@ -53,11 +57,25 @@ export default function WritePage() {
             weather: "SUNNY",
             moodIds: [],
             date: new Date().toISOString().split("T")[0],
+            isSecret: false,
         },
     });
 
     const selectedWeather = watch("weather");
     const selectedMoodIds = watch("moodIds");
+    const isSecret = watch("isSecret");
+
+    useEffect(() => {
+        if (session?.user) {
+            // Check if user has encryption key (it might be in session or we fetch it)
+            // Ideally session.user should have it if we added it to auth options.
+            // Let's check session struct. We viewed auth.ts before and it returns encryptionKey.
+            // @ts-ignore
+            if (session.user.encryptionKey && !session.user.keyError) {
+                setHasKey(true);
+            }
+        }
+    }, [session]);
 
     useEffect(() => {
         fetch("/api/moods")
@@ -100,7 +118,8 @@ export default function WritePage() {
                 router.push("/");
                 router.refresh();
             } else {
-                alert("일기 저장에 실패했습니다.");
+                const errorData = await res.json();
+                alert(errorData.message || "일기 저장에 실패했습니다.");
             }
         } catch (error) {
             console.error(error);
@@ -151,9 +170,32 @@ export default function WritePage() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900">일기 쓰기</h1>
-                <p className="text-gray-500 mt-2">오늘의 하루를 기록해보세요.</p>
+            <div className="flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">일기 쓰기</h1>
+                    <p className="text-gray-500 mt-2">오늘의 하루를 기록해보세요.</p>
+                </div>
+
+                {/* Secret Diary Toggle */}
+                <div className="flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
+                    {isSecret ? <Lock className="w-4 h-4 text-indigo-600" /> : <Unlock className="w-4 h-4 text-gray-400" />}
+                    <label htmlFor="secret-mode" className={cn("text-sm font-medium cursor-pointer", isSecret ? "text-indigo-700" : "text-gray-600")}>
+                        비밀 일기
+                    </label>
+                    <Switch
+                        id="secret-mode"
+                        checked={isSecret}
+                        disabled={!hasKey}
+                        onCheckedChange={(checked) => {
+                            if (!hasKey && checked) {
+                                alert("보안 키가 설정되어 있지 않아 비밀 일기를 쓸 수 없습니다.\n설정 페이지에서 보안 키를 확인해주세요.");
+                                return;
+                            }
+                            setValue("isSecret", checked, { shouldDirty: true });
+                        }}
+                        className="data-[state=checked]:bg-indigo-600"
+                    />
+                </div>
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">

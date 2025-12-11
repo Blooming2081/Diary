@@ -42,6 +42,7 @@ function SearchContent() {
     // Filter states
     const [query, setQuery] = useState(searchParams.get("q") || "");
     const [weather, setWeather] = useState(searchParams.get("weather") || "");
+    const [type, setType] = useState(searchParams.get("type") || "all"); // Filter state
     const [moodIds, setMoodIds] = useState<string[]>(
         searchParams.get("moodId") ? searchParams.get("moodId")!.split(",") : []
     );
@@ -60,6 +61,7 @@ function SearchContent() {
             const params = new URLSearchParams();
             if (debouncedQuery) params.append("search", debouncedQuery);
             if (weather) params.append("weather", weather);
+            if (type && type !== 'all') params.append("type", type);
             if (moodIds.length > 0) params.append("moodId", moodIds.join(","));
 
             try {
@@ -74,7 +76,7 @@ function SearchContent() {
         };
 
         fetchDiaries();
-    }, [debouncedQuery, weather, moodIds]);
+    }, [debouncedQuery, weather, moodIds, type]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -82,6 +84,7 @@ function SearchContent() {
         const params = new URLSearchParams();
         if (query) params.set("q", query);
         if (weather) params.set("weather", weather);
+        if (type && type !== 'all') params.set("type", type);
         if (moodIds.length > 0) params.set("moodId", moodIds.join(","));
         router.push(`/search?${params.toString()}`);
     };
@@ -107,6 +110,27 @@ function SearchContent() {
                 </div>
 
                 <div className="space-y-4">
+                    {/* Type Filter Tabs */}
+                    <div className="block">
+                        <div className="flex gap-2">
+                            {['all', 'general', 'secret'].map((t) => (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setType(t)}
+                                    className={cn(
+                                        "px-4 py-2 text-sm font-medium rounded-lg transition-all border cursor-pointer",
+                                        type === t
+                                            ? "bg-indigo-600 text-white border-indigo-600 shadow-md transform scale-105"
+                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                    )}
+                                >
+                                    {t === 'all' ? '전체' : t === 'general' ? '일반' : '비밀'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Weather Toggle */}
                     <div className="block">
                         <div className="flex gap-2">
@@ -203,6 +227,7 @@ function SearchContent() {
                                     <div>
                                         <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors break-all line-clamp-2">
                                             {diary.title}
+                                            {(diary as any).isSecret && <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold align-middle">SECRET</span>}
                                         </h3>
                                         <p className="text-sm text-gray-500 mt-1">
                                             {format(new Date(diary.date), "yyyy년 M월 d일 EEEE", {

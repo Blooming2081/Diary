@@ -78,3 +78,30 @@ export function decryptImage(buffer: Buffer, userKey: string): Buffer {
     const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
     return decrypted;
 }
+
+/**
+ * Encrypts a text string using the user's security key.
+ */
+export function encryptText(text: string, userKey: string): string {
+    const iv = crypto.randomBytes(16);
+    // Use a different salt for text just in case, or same one. Let's use 'text-salt'.
+    const key = crypto.scryptSync(userKey, 'text-salt', 32);
+    const cipher = crypto.createCipheriv(KEY_ALGO, key, iv); // Reuse KEY_ALGO (aes-256-cbc)
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return iv.toString('hex') + ':' + encrypted;
+}
+
+/**
+ * Decrypts a text string using the user's security key.
+ */
+export function decryptText(encryptedText: string, userKey: string): string {
+    const textParts = encryptedText.split(':');
+    const iv = Buffer.from(textParts.shift()!, 'hex');
+    const encryptedContent = textParts.join(':');
+    const key = crypto.scryptSync(userKey, 'text-salt', 32);
+    const decipher = crypto.createDecipheriv(KEY_ALGO, key, iv);
+    let decrypted = decipher.update(encryptedContent, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+}
